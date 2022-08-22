@@ -1,0 +1,80 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
+plugins {
+    id 'java'
+    id 'scala'
+}
+
+group 'io.github.maheevil'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'papermc-repo'
+        url = 'https://repo.papermc.io/repository/maven-public/'
+    }
+}
+
+dependencies {
+    implementation 'org.scala-lang:scala3-library_3:3.0.1'
+    implementation 'io.papermc.paper:paper-api:1.19-R0.1-SNAPSHOT'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+def targetJavaVersion = 17
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        options.release = targetJavaVersion
+    }
+}
+
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    filesMatching('plugin.yml') {
+        expand props
+    }
+}
+
+tasks.register('preRunServer'){
+    dependsOn tasks.build
+    doLast{
+        def runDir = "${projectDir.path}/run"
+        def filef = new File(runDir + '/plugins/' + this.rootProject.name + '.jar')
+        if(!filef.parentFile.exists()) {filef.parentFile.mkdirs()}
+        filef.createNewFile()
+
+        def pluginName = this.rootProject.name + '-' + this.properties.get('version') + '.jar'
+        def pluginPath = new File(projectDir.path + '/build/libs/' + pluginName)
+        Files.copy(pluginPath.toPath(),filef.toPath(), StandardCopyOption.REPLACE_EXISTING)
+
+        // new method
+        def paperClipJar = new File(runDir + "/paper-1.19-81.jar")
+        if (!paperClipJar.exists()) {
+            new URL('https://api.papermc.io/v2/projects/paper/versions/1.19/builds/81/downloads/paper-1.19-81.jar').withInputStream{ i -> paperClipJar.withOutputStream{ it << i }}
+        }
+    }
+}
+
+task runServer(type: JavaExec){
+    dependsOn tasks.getByName('preRunServer')
+    def runDir = "${projectDir.path}/run"
+    classpath = files(runDir + '/paper-1.19-81.jar')
+    workingDir = file(runDir)
+}
+
+test {
+    useJUnitPlatform()
+}

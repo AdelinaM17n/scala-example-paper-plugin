@@ -1,0 +1,6 @@
+name: Example
+version: '1.0.0'
+main: io.github.maheevil.example.ExamplePlugin
+api-version: 1.19
+authors: [ Maheesha ]
+description: TPs you to the wild
